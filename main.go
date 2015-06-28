@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"go/build"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -32,7 +34,7 @@ func processArgs(args []string) (goFlags []string, pkgSpec string, pkgArgs []str
 			return
 		}
 	}
-	goFlags = args
+	pkgArgs = args
 	return
 }
 
@@ -45,6 +47,34 @@ func exeSuffix() string {
 		return ".exe"
 	}
 	return ""
+}
+
+func installEnv(GOBIN string) (ret []string) {
+	env := os.Environ()
+	ret = make([]string, 0, len(env)+1)
+	for _, p := range env {
+		if strings.HasPrefix(p, "GOBIN=") {
+			continue
+		}
+		ret = append(ret, p)
+	}
+	ret = append(ret, "GOBIN="+GOBIN)
+	return
+}
+
+func copyFile(src, dst string) (err error) {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer srcFile.Close()
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0755)
+	if err != nil {
+		return
+	}
+	defer dstFile.Close()
+	_, err = io.Copy(dstFile, srcFile)
+	return
 }
 
 func main() {
@@ -61,11 +91,21 @@ func main() {
 		fmt.Fprintln(os.Stderr, "package is not a command")
 		os.Exit(2)
 	}
-	exeName := path.Base(pkg.ImportPath) + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
 	godoDir := path.Join(os.TempDir(), "godo")
-	buildOutputPath := path.Join(godoDir, exeName)
-	fmt.Fprintf(os.Stderr, "building command at %q\n", buildOutputPath)
-	buildArgs := []string{"build", "-i", "-o", buildOutputPath, "-i"}
+	pkgBase := pkg.ImportPath
+	if pkgBase == "." {
+		wd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		pkgBase = wd
+	}
+	pkgBase = filepath.Base(pkgBase)
+	execExeName := pkgBase + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
+	stageExeName := pkgBase + exeSuffix()
+	execFilePath := filepath.Join(godoDir, execExeName)
+	buildArgs := []string{"install"}
 	buildArgs = append(buildArgs, goFlags...)
 	buildArgs = append(buildArgs, pkgSpec)
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
@@ -75,6 +115,7 @@ func main() {
 		defer tty.Close()
 	}
 	cmd := exec.Command("go", buildArgs...)
+	cmd.Env = installEnv(godoDir)
 	cmd.Stderr = tty
 	cmd.Stdout = tty
 	err = cmd.Run()
@@ -82,9 +123,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error building command: %s\n", err)
 		os.Exit(1)
 	}
-	execArgv := append([]string{buildOutputPath}, pkgArgs...)
-	fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
-	err = syscall.Exec(buildOutputPath, execArgv, os.Environ())
+	err = copyFile(filepath.Join(godoDir, stageExeName), execFilePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	execArgv := append([]string{execFilePath}, pkgArgs...)
+	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
+	err = syscall.Exec(execFilePath, execArgv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error execing command: %s\n", err)
 		os.Exit(1)
