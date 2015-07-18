@@ -78,6 +78,14 @@ func copyFile(src, dst string) (err error) {
 }
 
 func main() {
+	if len(os.Args[1:]) == 1 {
+		switch os.Args[1] {
+		case "-h", "--help":
+			fmt.Fprintf(os.Stderr, "%s", "godo is an improved `go run`.\n\nUsage:\n  godo [go build flags] <package spec> [binary arguments]\n  godo -h | --help\n")
+			return
+		default:
+		}
+	}
 	goFlags, pkgSpec, pkgArgs := processArgs(os.Args[1:])
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
