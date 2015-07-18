@@ -1,8 +1,16 @@
 # godo
 
-godo is an executable that builds and invokes the command given by a Go package spec.
+godo is an executable that builds and invokes the command given by a Go package spec. It's similar to `go run` but with many advantages.
 
 ```sh
+$ godo -h
+godo is an improved `go run`.
+
+Usage:
+  godo [go build flags] <package spec> [binary arguments]
+  godo -h | --help
+```
+```
 $ godo github.com/anacrolix/dms
 22:22:16 main.go:211: added 1148 items from cache
 22:22:16 dms.go:892: HTTP srv on [::]:1338
@@ -41,17 +49,20 @@ Binaries are built and invoked at `$TMPDIR/godo/`. Binaries are stored with the 
 ```
 $ echo $TMPDIR
 /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/
+
 $ godo github.com/motemen/gore -h
 Usage of /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/godo/gore.12943:
 <snip>
+
 $ godo github.com/motemen/gore -h
 Usage of /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/godo/gore.13055:
 <snip>
+
 $ ls "$TMPDIR/godo/gore.*" -t
 gore.12943  gore.13055
 ```
 
-### Godoception
+### Godo-ception
 
 ```
 $ godo github.com/anacrolix/godo cmd/go run "$GOPATH/src/github.com/anacrolix/godo/"*.go cmd/go list github.com/anacrolix/...
