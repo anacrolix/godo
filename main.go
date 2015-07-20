@@ -81,7 +81,7 @@ func main() {
 	if len(os.Args[1:]) == 1 {
 		switch os.Args[1] {
 		case "-h", "--help":
-			fmt.Fprintf(os.Stderr, "%s", "godo is an improved `go run`.\n\nUsage:\n  godo [go build flags] <package spec> [binary arguments]\n  godo -h | --help\n")
+			fmt.Fprintf(os.Stderr, "%s", "godo is an alternative to `go run`.\n\nUsage:\n  godo [go build flags] <package spec> [binary arguments]\n  godo -h | --help\n")
 			return
 		default:
 		}

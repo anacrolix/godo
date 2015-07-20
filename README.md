@@ -1,74 +1,62 @@
 # godo
 
-godo is an executable that builds and invokes the command given by a Go package spec. It's similar to `go run` but with many advantages.
+`godo` is an alternative to `go run`. It's useful when you want to avoid the `go build`/`go install`, `/path/to/somebin` cycle. There's also a bash completion script, which makes it easy to quickly invoke a Go package from your `GOPATH`.
+
+`godo` differs from `go run` in the following respects:
+
+* The package to execute is specified by import path, rather than some constituent source files.
+ * `godo github.com/anacrolix/missinggo/cmd/nop` vs.
+ * `go run $GOPATH/src/github.com/anacrolix/missinggo/cmd/nop/*.go`
+* The generated binary is stored at `$TMPDIR/godo/$pkgname.$$`. This means that:
+ * It's easy to locate the binary for a process running through godo.
+ * The proctitle is `$pkgname.$$`.
+ * There is a bounded history of binaries due to the OS PID reuse policy.
+* The main package isn't rebuilt unnecessarily, avoiding a link step for successive `godo` calls to the same package. For example a `go run` invocation for a large application on my system has a mandatory ~0.8s delay even if the files haven't changed. `godo` has this at 0.04s.
+
+## Usage
 
 ```sh
 $ godo -h
-godo is an improved `go run`.
+godo is an alternative to `go run`.
 
 Usage:
   godo [go build flags] <package spec> [binary arguments]
   godo -h | --help
 ```
+
+### Example
 ```
-$ godo github.com/anacrolix/dms
-22:22:16 main.go:211: added 1148 items from cache
-22:22:16 dms.go:892: HTTP srv on [::]:1338
-22:22:16 dms.go:194: started SSDP on lo0
-22:22:16 dms.go:194: started SSDP on en0
-...
-```
+# first run
+$ time godo github.com/anacrolix/missinggo/cmd/nop
 
-Arguments given *before* the package spec are passed to `go build`. For example `-v` and `-race`.
+real	0m0.244s
+user	0m0.177s
+sys	0m0.071s
 
-```
-anacrolix@Matts-MacBook-Pro:~$ godo -v github.com/anacrolix/dms
-github.com/anacrolix/dms/soap
-golang.org/x/net/internal/iana
-github.com/anacrolix/dms/transcode
-github.com/anacrolix/dms/rrcache
-golang.org/x/net/ipv4
-github.com/anacrolix/dms/ssdp
-github.com/anacrolix/dms/dlna/dms
-github.com/anacrolix/dms
-<program begins running>
-```
+$ time godo github.com/anacrolix/missinggo/cmd/nop
 
-Arguments passed *after* the package spec, are passed to the invoked executable.
+real	0m0.046s
+user	0m0.012s
+sys	0m0.022s
 
-```
-$ godo github.com/motemen/gore -h
-Usage of /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/godo/gore.12943:
-  -autoimport=false: formats and adjusts imports automatically
-  -context="": import packages, functions, variables and constants from external golang source files
-  -pkg="": specify a package where the session will be run inside
-```
-
-Binaries are built and invoked at `$TMPDIR/godo/`. Binaries are stored with the PID of the godo instance that invoked them as a suffix. This makes it easy to locate the binary that belongs to any process invoked by godo, populates the proctitle with a unique executable name, and results in a conveniently bounded history of invoked binaries.
-
-```
-$ echo $TMPDIR
-/var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/
-
-$ godo github.com/motemen/gore -h
-Usage of /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/godo/gore.12943:
-<snip>
-
-$ godo github.com/motemen/gore -h
-Usage of /var/folders/j8/n6cvt4453nzcp5cn9xpbcn9r0000gn/T/godo/gore.13055:
-<snip>
-
-$ ls "$TMPDIR/godo/gore.*" -t
-gore.12943  gore.13055
-```
-
-### Godo-ception
-
-```
-$ godo github.com/anacrolix/godo cmd/go run "$GOPATH/src/github.com/anacrolix/godo/"*.go cmd/go list github.com/anacrolix/...
-<all my herptastic Go code>
+# historical binaries
+$ ls -tr $TMPDIR/godo/ | grep nop.
+nop.40586
+nop.40590
 ```
 
 ## Installation
 
     go get github.com/anacrolix/godo
+
+Bash completion:
+
+    go install github.com/anacrolix/godo/go-list-cmd
+    . "$GOPATH/src/github.com/anacrolix/godo/complete.sh"
+
+## Godo-ception
+
+```
+$ godo github.com/anacrolix/godo cmd/go run "$GOPATH/src/github.com/anacrolix/godo/"*.go cmd/go list github.com/anacrolix/...
+<all my herptastic Go code>
+```
