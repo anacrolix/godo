@@ -77,6 +77,20 @@ func copyFile(src, dst string) (err error) {
 	return
 }
 
+func getPackage(spec string, flags []string) {
+	args := []string{"get"}
+	args = append(args, flags...)
+	args = append(args, "-d", spec)
+	cmd := exec.Command("go", args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting package: %s", err)
+		os.Exit(1)
+	}
+}
+
 func main() {
 	if len(os.Args[1:]) == 1 {
 		switch os.Args[1] {
@@ -90,6 +104,7 @@ func main() {
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
+	getPackage(pkgSpec, goFlags)
 	pkg, err := build.Import(pkgSpec, ".", 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error locating package: %s\n", err)
