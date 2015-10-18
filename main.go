@@ -56,6 +56,9 @@ func installEnv(GOBIN string) (ret []string) {
 		if strings.HasPrefix(p, "GOBIN=") {
 			continue
 		}
+		if strings.HasPrefix(p, "GODEBUG=") {
+			continue
+		}
 		ret = append(ret, p)
 	}
 	ret = append(ret, "GOBIN="+GOBIN)
@@ -84,6 +87,7 @@ func getPackage(spec string, flags []string) {
 	cmd := exec.Command("go", args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stderr
+	cmd.Env = installEnv("/dev/null")
 	err := cmd.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting package: %s", err)
