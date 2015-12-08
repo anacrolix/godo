@@ -90,7 +90,7 @@ func getPackage(spec string, flags []string) {
 	cmd.Env = installEnv("/dev/null")
 	err := cmd.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting package: %s", err)
+		fmt.Fprintf(os.Stderr, "error getting package: %s\n", err)
 		os.Exit(1)
 	}
 }
