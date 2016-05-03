@@ -1,8 +1,9 @@
 _godo() {
-	local cur prev
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev=("${COMP_WORDS[@]:1:COMP_CWORD-1}")
+    # COMP_CWORD < 0 breaks this function, and I don't know what it means.
+    [[ $COMP_CWORD < 0 ]] && return
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev=("${COMP_WORDS[@]:1:COMP_CWORD-1}")
 
     if [[ ${cur} == -* ]]; then return; fi
     if [[ ${cur} == /* ]]; then return; fi
