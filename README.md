@@ -4,14 +4,14 @@
 
 `godo` differs from `go run` in the following respects:
 
- * The package to execute is specified by import path, rather than some constituent source files.
- * `godo github.com/anacrolix/missinggo/cmd/nop` vs.
- * `go run $GOPATH/src/github.com/anacrolix/missinggo/cmd/nop/*.go`
- * The generated binary is stored at `$TMPDIR/godo/$pkgname.$$`. This means that:
- * It's easy to locate the binary for a process running through godo.
- * The proctitle is `$pkgname.$$`, e.g. `torrent.123`, where the package name of the binary was `torrent`, and its PID is `123`.
- * There is a bounded history of binaries due to the OS PID reuse policy. After PIDs cap at around 32K, they'll return to lower values, gradually replacing older binaries that are no longer associated with running processes.
- * The main package isn't rebuilt unnecessarily, avoiding a link step for successive `godo` calls to the same package. For example a `go run` invocation for a large application on my system has a mandatory ~0.8s delay even if the files haven't changed. `godo` has this at 0.04s for a hot run, because it's able to reuse the existing binary.
+* The package to execute is specified by import path, rather than some constituent source files.
+ - `godo github.com/anacrolix/missinggo/cmd/nop` vs.
+ - `go run $GOPATH/src/github.com/anacrolix/missinggo/cmd/nop/*.go`
+* The generated binary is stored at `$TMPDIR/godo/$pkgname.$$`. This means that:
+ - It's easy to locate the binary for a process running through godo.
+ - The proctitle is `$pkgname.$$`, e.g. `torrent.123`, where the package name of the binary was `torrent`, and its PID is `123`.
+ - There is a bounded history of binaries due to the OS PID reuse policy. After PIDs cap at around 32K, they'll return to lower values, gradually replacing older binaries that are no longer associated with running processes.
+* The main package isn't rebuilt unnecessarily, avoiding a link step for successive `godo` calls to the same package. For example a `go run` invocation for a large application on my system has a mandatory ~0.8s delay even if the files haven't changed. `godo` has this at 0.04s, because it's able to reuse the existing binary.
 
 ## Usage
 
