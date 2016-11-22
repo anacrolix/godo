@@ -14,7 +14,11 @@ import (
 	"syscall"
 )
 
-const debug = false
+const (
+	debug = false
+	// Whether to redirect the go cmd's stdout and stderr to tty.
+	goTTY = false
+)
 
 // args should not include the executed file path common to argv[0]. goFlags
 // are flags passed to the command used to build the command. pkgSpec is the
@@ -135,16 +139,18 @@ func main() {
 	buildArgs := []string{"install"}
 	buildArgs = append(buildArgs, goFlags...)
 	buildArgs = append(buildArgs, pkgSpec)
-	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-	if err != nil {
-		tty = os.Stderr
-	} else {
-		defer tty.Close()
-	}
 	cmd := exec.Command("go", buildArgs...)
 	cmd.Env = installEnv(godoDir)
-	cmd.Stderr = tty
-	cmd.Stdout = tty
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if goTTY {
+		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+		if err == nil {
+			defer tty.Close()
+			cmd.Stdout = tty
+			cmd.Stderr = tty
+		}
+	}
 	err = cmd.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error building command: %s\n", err)
