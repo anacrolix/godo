@@ -99,6 +99,23 @@ func getPackage(spec string, flags []string) {
 	}
 }
 
+func fixAbsPkgSpec(s string) string {
+	if !filepath.IsAbs(s) {
+		return s
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	s, err = filepath.Rel(wd, s)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	return s
+}
+
 func main() {
 	if len(os.Args[1:]) == 1 {
 		switch os.Args[1] {
@@ -112,7 +129,9 @@ func main() {
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
+	pkgSpec = fixAbsPkgSpec(pkgSpec)
 	getPackage(pkgSpec, goFlags)
+	pkgSpec = fixAbsPkgSpec(pkgSpec)
 	pkg, err := build.Import(pkgSpec, ".", 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error locating package: %s\n", err)
