@@ -17,7 +17,8 @@ import (
 const (
 	debug = false
 	// Whether to redirect the go cmd's stdout and stderr to tty.
-	goTTY = false
+	goTTY             = false
+	execWithPidSuffix = false
 )
 
 // args should not include the executed file path common to argv[0]. goFlags
@@ -141,7 +142,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "package is not a command")
 		os.Exit(2)
 	}
-	godoDir := path.Join(os.TempDir(), "godo")
+	godoDir := path.Join(os.Getenv("GOPATH"), "godo")
 	pkgBase := pkg.ImportPath
 	if pkgBase == "." {
 		wd, err := os.Getwd()
@@ -152,8 +153,14 @@ func main() {
 		pkgBase = wd
 	}
 	pkgBase = filepath.Base(pkgBase)
-	execExeName := pkgBase + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
 	stageExeName := pkgBase + exeSuffix()
+	execExeName := func() string {
+		if execWithPidSuffix {
+			return pkgBase + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
+		} else {
+			return stageExeName
+		}
+	}()
 	execFilePath := filepath.Join(godoDir, execExeName)
 	buildArgs := []string{"install"}
 	buildArgs = append(buildArgs, goFlags...)
@@ -175,10 +182,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error building command: %s\n", err)
 		os.Exit(1)
 	}
-	err = copyFile(filepath.Join(godoDir, stageExeName), execFilePath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if execWithPidSuffix {
+		err = copyFile(filepath.Join(godoDir, stageExeName), execFilePath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 	execArgv := append([]string{execFilePath}, pkgArgs...)
 	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
