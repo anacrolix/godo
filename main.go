@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -142,7 +141,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "package is not a command")
 		os.Exit(2)
 	}
-	godoDir := path.Join(os.Getenv("GOPATH"), "godo")
+	godoDir := filepath.Join(build.Default.GOPATH, "godo")
 	pkgBase := pkg.ImportPath
 	if pkgBase == "." {
 		wd, err := os.Getwd()
