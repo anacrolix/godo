@@ -116,12 +116,35 @@ func fixAbsPkgSpec(s string) string {
 	return s
 }
 
+func withWorkDir(tmpDir string, f func()) (err error) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	err = os.Chdir(tmpDir)
+	if err != nil {
+		return
+	}
+	defer func() {
+		err = os.Chdir(origDir)
+	}()
+	f()
+	return
+}
+
 func main() {
+	err := mainErr()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func mainErr() error {
 	if len(os.Args[1:]) == 1 {
 		switch os.Args[1] {
 		case "-h", "--help":
 			fmt.Fprintf(os.Stderr, "%s", "godo is an alternative to `go run`.\n\nUsage:\n  godo [go build flags] <package spec> [binary arguments]\n  godo -h | --help\n")
-			return
+			return nil
 		default:
 		}
 	}
@@ -129,70 +152,76 @@ func main() {
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
-	pkgSpec = fixAbsPkgSpec(pkgSpec)
-	getPackage(pkgSpec, goFlags)
-	pkgSpec = fixAbsPkgSpec(pkgSpec)
-	pkg, err := build.Import(pkgSpec, ".", 0)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error locating package: %s\n", err)
-		os.Exit(2)
-	}
-	if !pkg.IsCommand() {
-		fmt.Fprintln(os.Stderr, "package is not a command")
-		os.Exit(2)
-	}
-	godoDir := filepath.Join(build.Default.GOPATH, "godo")
-	pkgBase := pkg.ImportPath
-	if pkgBase == "." {
-		wd, err := os.Getwd()
+	var execFilePath *string
+	if err := withWorkDir(pkgSpec, func() {
+		pkg, err := build.Import(".", ".", 0)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "error locating package: %s\n", err)
+			os.Exit(2)
+		}
+		if !pkg.IsCommand() {
+			fmt.Fprintln(os.Stderr, "package is not a command")
+			os.Exit(2)
+		}
+		godoDir := filepath.Join(build.Default.GOPATH, "godo")
+		pkgBase := pkg.ImportPath
+		if pkgBase == "." {
+			wd, err := os.Getwd()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			pkgBase = wd
+		}
+		pkgBase = filepath.Base(pkgBase)
+		stageExeName := pkgBase + exeSuffix()
+		execExeName := func() string {
+			if execWithPidSuffix {
+				return pkgBase + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
+			} else {
+				return stageExeName
+			}
+		}()
+		execFilePath = func() *string {
+			s := filepath.Join(godoDir, execExeName)
+			return &s
+		}()
+		buildArgs := []string{"install"}
+		buildArgs = append(buildArgs, goFlags...)
+		buildArgs = append(buildArgs, ".")
+		cmd := exec.Command("go", buildArgs...)
+		cmd.Env = installEnv(godoDir)
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+		if goTTY {
+			tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+			if err == nil {
+				defer tty.Close()
+				cmd.Stdout = tty
+				cmd.Stderr = tty
+			}
+		}
+		err = cmd.Run()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error building command: %s\n", err)
 			os.Exit(1)
 		}
-		pkgBase = wd
-	}
-	pkgBase = filepath.Base(pkgBase)
-	stageExeName := pkgBase + exeSuffix()
-	execExeName := func() string {
 		if execWithPidSuffix {
-			return pkgBase + "." + fmt.Sprintf("%d", os.Getpid()) + exeSuffix()
-		} else {
-			return stageExeName
+			err = copyFile(filepath.Join(godoDir, stageExeName), *execFilePath)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
 		}
-	}()
-	execFilePath := filepath.Join(godoDir, execExeName)
-	buildArgs := []string{"install"}
-	buildArgs = append(buildArgs, goFlags...)
-	buildArgs = append(buildArgs, pkgSpec)
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Env = installEnv(godoDir)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if goTTY {
-		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-		if err == nil {
-			defer tty.Close()
-			cmd.Stdout = tty
-			cmd.Stderr = tty
-		}
+	}); err != nil {
+		return err
 	}
-	err = cmd.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error building command: %s\n", err)
-		os.Exit(1)
-	}
-	if execWithPidSuffix {
-		err = copyFile(filepath.Join(godoDir, stageExeName), execFilePath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-	}
-	execArgv := append([]string{execFilePath}, pkgArgs...)
+	execArgv := append([]string{*execFilePath}, pkgArgs...)
 	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
-	err = syscall.Exec(execFilePath, execArgv, os.Environ())
+	err := syscall.Exec(*execFilePath, execArgv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error execing command: %s\n", err)
 		os.Exit(1)
 	}
+	return nil
 }
