@@ -200,7 +200,10 @@ func mainErr() error {
 		}()
 		buildArgs := []string{"build"}
 		buildArgs = append(buildArgs, goFlags...)
-		buildArgs = append(buildArgs, "-o", godoDir, ".")
+		// By adding a directory separator, we ensure that go always interprets the target as a
+		// directory to put the binary in. Otherwise, if the directory doesn't exist, it creates
+		// "$GOPATH/godo" as the binary itself.
+		buildArgs = append(buildArgs, "-o", godoDir+string(filepath.Separator), ".")
 		cmd := exec.Command("go", buildArgs...)
 		cmd.Env = buildEnv()
 		cmd.Stdout = os.Stderr
