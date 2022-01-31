@@ -232,7 +232,8 @@ func mainErr() error {
 	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
 	err := syscall.Exec(*execFilePath, execArgv, os.Environ())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error execing command: %s\n", err)
+		fmt.Fprintf(os.Stderr, "error execing command [arv0=%q, argv=%q, environ=%q]: %s\n",
+			*execFilePath, execArgv, os.Environ(), err)
 		os.Exit(1)
 	}
 	return nil
