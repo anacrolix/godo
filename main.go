@@ -69,6 +69,18 @@ func installEnv(GOBIN string) (ret []string) {
 	return
 }
 
+func buildEnv() (ret []string) {
+	env := os.Environ()
+	ret = make([]string, 0, len(env))
+	for _, p := range env {
+		if strings.HasPrefix(p, "GODEBUG=") {
+			continue
+		}
+		ret = append(ret, p)
+	}
+	return
+}
+
 func copyFile(src, dst string) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -186,11 +198,11 @@ func mainErr() error {
 			s := filepath.Join(godoDir, execExeName)
 			return &s
 		}()
-		buildArgs := []string{"install"}
+		buildArgs := []string{"build"}
 		buildArgs = append(buildArgs, goFlags...)
-		buildArgs = append(buildArgs, ".")
+		buildArgs = append(buildArgs, "-o", godoDir, ".")
 		cmd := exec.Command("go", buildArgs...)
-		cmd.Env = installEnv(godoDir)
+		cmd.Env = buildEnv()
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 		if goTTY {
