@@ -47,11 +47,11 @@ nop.40590
 
 ## Installation
 
-    go get github.com/anacrolix/godo
+    go install github.com/anacrolix/godo@latest
 
 Bash completion:
 
-    go install github.com/anacrolix/godo/go-list-cmd
+    go install github.com/anacrolix/godo/go-list-cmd@latest
     . "$GOPATH/src/github.com/anacrolix/godo/complete.sh"
 
 ## Godo-ception
