@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"go/build"
 	"io"
@@ -20,25 +21,32 @@ const (
 	execWithPidSuffix = false
 )
 
+const exitCodeUsage = 2
+
+type exitError struct {
+	error
+	code int
+}
+
+func (me exitError) ExitCode() int {
+	return me.code
+}
+
 // args should not include the executed file path common to argv[0]. goFlags
 // are flags passed to the command used to build the command. pkgSpec is the
 // package to build/execute. pkgArgs are the final command's arguments.
-func processArgs(args []string) (goFlags []string, pkgSpec string, pkgArgs []string) {
-	pkgSpec = "."
+func processArgs(args []string) (goFlags []string, pkgSpec string, pkgArgs []string, err error) {
 	for i, arg := range args {
-		if arg == "--" {
+		if arg == "--" && len(args[i+1:]) > 0 {
+			pkgSpec = args[i+1]
 			goFlags = args[:i]
-			pkgArgs = args[i+1:]
-			return
-		}
-		if !strings.HasPrefix(arg, "-") {
-			pkgSpec = arg
-			goFlags = args[:i]
-			pkgArgs = args[i+1:]
+			pkgArgs = args[i+2:]
 			return
 		}
 	}
-	pkgArgs = args
+	err = exitError{
+		errors.New(`expected "--" then a command package directory path`),
+		exitCodeUsage}
 	return
 }
 
@@ -147,7 +155,13 @@ func withWorkDir(tmpDir string, f func()) (err error) {
 func main() {
 	err := mainErr()
 	if err != nil {
-		log.Fatal(err)
+		code := 1
+		var exiter exitError
+		if errors.As(err, &exiter) {
+			code = exiter.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "godo: %v\n", err)
+		os.Exit(code)
 	}
 }
 
@@ -160,7 +174,11 @@ func mainErr() error {
 		default:
 		}
 	}
-	goFlags, pkgSpec, pkgArgs := processArgs(os.Args[1:])
+	goFlags, pkgSpec, pkgArgs, err := processArgs(os.Args[1:])
+	if err != nil {
+		err = fmt.Errorf("processing args: %w", err)
+		return err
+	}
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
@@ -168,12 +186,12 @@ func mainErr() error {
 	if err := withWorkDir(pkgSpec, func() {
 		pkg, err := build.Import(".", ".", 0)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error locating package: %s\n", err)
-			os.Exit(2)
+			err = fmt.Errorf("error locating package: %w", err)
+			return
 		}
 		if !pkg.IsCommand() {
-			fmt.Fprintln(os.Stderr, "package is not a command")
-			os.Exit(2)
+			err = exitError{errors.New("package is not a command"), exitCodeUsage}
+			return
 		}
 		godoDir := filepath.Join(build.Default.GOPATH, "godo")
 		pkgBase := pkg.ImportPath
@@ -233,7 +251,7 @@ func mainErr() error {
 	}
 	execArgv := append([]string{*execFilePath}, pkgArgs...)
 	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
-	err := syscall.Exec(*execFilePath, execArgv, os.Environ())
+	err = syscall.Exec(*execFilePath, execArgv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error execing command [arv0=%q, argv=%q, environ=%q]: %s\n",
 			*execFilePath, execArgv, os.Environ(), err)
