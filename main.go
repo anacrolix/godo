@@ -182,7 +182,7 @@ func mainErr() error {
 	if debug {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
-	var execFilePath *string
+	var execFilePath, cmdName *string
 	if err := withWorkDir(pkgSpec, func() {
 		pkg, err := build.Import(".", ".", 0)
 		if err != nil {
@@ -204,6 +204,7 @@ func mainErr() error {
 			pkgBase = wd
 		}
 		pkgBase = filepath.Base(pkgBase)
+		cmdName = &pkgBase
 		stageExeName := pkgBase + exeSuffix()
 		execExeName := func() string {
 			if execWithPidSuffix {
@@ -250,7 +251,12 @@ func mainErr() error {
 		return err
 	}
 	execArgv := append([]string{*execFilePath}, pkgArgs...)
-	// fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
+	//fmt.Fprintf(os.Stderr, "exec %q\n", execArgv)
+
+	// There's no feedback when godo execs, so sometimes if the command doesn't output anything, you
+	// can't tell if it's stuck building still. This might be an argument to handle build flags
+	// manually, so we can add godo specific ones, and drop requiring the -- separator again.
+	fmt.Fprintf(os.Stderr, "godo: starting %v\n", *cmdName)
 	err = syscall.Exec(*execFilePath, execArgv, os.Environ())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error execing command [arv0=%q, argv=%q, environ=%q]: %s\n",
