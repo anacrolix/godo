@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+
+	"golang.org/x/tools/go/packages"
 )
 
 const (
@@ -183,18 +185,23 @@ func mainErr() error {
 		log.Println(goFlags, pkgSpec, pkgArgs)
 	}
 	var execFilePath, cmdName *string
-	if err := withWorkDir(pkgSpec, func() {
-		pkg, err := build.Import(".", ".", 0)
+	if wdErr := withWorkDir(pkgSpec, func() {
+		var pkgs []*packages.Package
+		pkgs, err = packages.Load(&packages.Config{
+			Mode: 0,
+		})
+		//pkg, err = build.Import(".", ".", 0)
 		if err != nil {
 			err = fmt.Errorf("error locating package: %w", err)
 			return
 		}
-		if !pkg.IsCommand() {
-			err = exitError{errors.New("package is not a command"), exitCodeUsage}
+		pkg := pkgs[0]
+		if pkgs[0].Name != "main" {
+			err = exitError{fmt.Errorf("package %q is not a command", pkg.PkgPath), exitCodeUsage}
 			return
 		}
 		godoDir := filepath.Join(build.Default.GOPATH, "godo")
-		pkgBase := pkg.ImportPath
+		pkgBase := pkgs[0].PkgPath
 		if pkgBase == "." {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -247,7 +254,10 @@ func mainErr() error {
 				os.Exit(1)
 			}
 		}
-	}); err != nil {
+	}); wdErr != nil {
+		return wdErr
+	}
+	if err != nil {
 		return err
 	}
 	execArgv := append([]string{*execFilePath}, pkgArgs...)
