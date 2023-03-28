@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"go/build"
 	"io"
 	"log"
@@ -195,8 +196,28 @@ func mainErr() error {
 			err = fmt.Errorf("error locating package: %w", err)
 			return
 		}
+		if len(pkgs) != 1 {
+			err = fmt.Errorf("more than one package loaded")
+			return
+		}
+		if false {
+			spew.Dump(pkgs)
+		}
 		pkg := pkgs[0]
-		if pkgs[0].Name != "main" {
+		for _, pkgErr := range pkg.Errors {
+			err = errors.Join(err, pkgErr)
+		}
+		if err != nil {
+			err = fmt.Errorf("package errors: %w", err)
+			return
+		}
+		if false {
+			spewConfig := spew.ConfigState{
+				DisableMethods: true,
+			}
+			spewConfig.Dump(*pkg)
+		}
+		if pkg.Name != "main" {
 			err = exitError{fmt.Errorf("package %q is not a command", pkg.PkgPath), exitCodeUsage}
 			return
 		}
