@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"go/build"
 	"io"
 	"log"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/tools/go/packages"
 )
 
